@@ -1,0 +1,9 @@
+[package]
+name = "code_formatter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# 仅保留 2 个核心依赖：命令行 + 错误处理
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0.75"
