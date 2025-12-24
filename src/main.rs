@@ -4,27 +4,33 @@ use std::fs::{read_to_string, write};
 use std::path::Path;
 
 /// 压缩代码格式化工具：符合行业规范的 HTML/CSS/JS/TS 格式化（高可读性）
+/// Code formatter for compressed code: Industry-standard HTML/CSS/JS/TS formatting (high readability)
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// 输入文件路径（必填）
+    /// Input file path (required)
     #[arg(short = 'i', long = "input", required = true, help = "输入压缩代码的文件路径")]
     input: String,
 
     /// 输出文件路径（必填）
+    /// Output file path (required)
     #[arg(short = 'o', long = "output", required = true, help = "格式化后代码的输出文件路径")]
     output: String,
 
     /// 缩进空格数（可选，默认 4）
+    /// Number of spaces for indentation (optional, defaults to 4)
     #[arg(short = 'n', long = "indent", default_value_t = 4, help = "缩进空格数量，默认 4")]
     indent: u8,
 
     /// 单行最大长度（可选，默认 80）
+    /// Maximum line length (optional, defaults to 80)
     #[arg(short = 'l', long = "line-length", default_value_t = 80, help = "单行最大字符长度，默认 80")]
     line_length: usize,
 }
 
 /// 根据文件扩展名判断代码类型
+/// Determine code type based on file extension
 fn get_file_type(file_path: &str) -> Result<&str> {
     let ext = Path::new(file_path)
         .extension()
@@ -41,10 +47,13 @@ fn get_file_type(file_path: &str) -> Result<&str> {
     }
 }
 
-// ------------------------------
+// ============================================================================
 // 通用工具函数
-// ------------------------------
+// General Utility Functions
+// ============================================================================
+
 /// 为运算符/符号添加规范空格
+/// Add standardized spaces around operators/symbols
 fn add_operator_spaces(s: &str) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
@@ -54,7 +63,7 @@ fn add_operator_spaces(s: &str) -> String {
             '=' | '+' | '-' | '*' | '/' | '%' | '>' | '<' | '!' | '&' | '|' | '^' | '~' => {
                 let mut op = String::from(c);
                 while let Some(&next_c) = chars.peek() {
-                    if next_c == '=' || (op == "&" && next_c == '&') || (op == "|" && next_c == '|') {
+                    if next_c == '=' || (op == "&" && next_c == '&') || (op == "|" && next_c == '|") {
                         op.push(next_c);
                         chars.next();
                     } else {
@@ -115,6 +124,7 @@ fn add_operator_spaces(s: &str) -> String {
 }
 
 /// 拆分扎堆的括号并保留缩进
+/// Split clustered brackets while preserving indentation
 fn split_clustered_brackets(s: &str, indent_unit: &str, current_indent: usize) -> String {
     let mut result = String::new();
     let mut chars = s.chars().peekable();
@@ -165,6 +175,7 @@ fn split_clustered_brackets(s: &str, indent_unit: &str, current_indent: usize) -
                 current_line_length = 0;
                 consecutive_brackets = 0;
                 // 核心修复：换行后自动补充当前缩进
+                // Core fix: Automatically add current indentation after line breaks
                 result.push_str(&indent_unit.repeat(current_indent + bracket_stack.len()));
                 current_line_length = indent_unit.len() * (current_indent + bracket_stack.len());
             }
@@ -184,9 +195,11 @@ fn split_clustered_brackets(s: &str, indent_unit: &str, current_indent: usize) -
     result
 }
 
-// ------------------------------
+// ============================================================================
 // HTML 格式化（完整缩进 + 最后一行处理）
-// ------------------------------
+// HTML Formatting (full indentation + last line handling)
+// ============================================================================
+
 fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<String> {
     let indent_unit = " ".repeat(indent as usize);
     let mut result = String::new();
@@ -197,6 +210,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
     let mut current_line_length = 0;
 
     // 初始缩进
+    // Initial indentation
     result.push_str(&indent_unit.repeat(current_indent_level));
 
     while let Some(c) = chars.next() {
@@ -231,6 +245,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                 }
 
                 // 标签属性格式化
+                // Tag attribute formatting
                 let mut formatted_tag = String::new();
                 let mut tag_chars = tag_buf.chars().peekable();
                 while let Some(tc) = tag_chars.next() {
@@ -275,6 +290,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                 if tag_str.starts_with('/') {
                     current_indent_level = current_indent_level.saturating_sub(1);
                     // 闭合标签前回退缩进
+                    // Reduce indentation before closing tag
                     if result.ends_with(&indent_unit.repeat(current_indent_level + 1)) {
                         result.truncate(result.len() - indent_unit.len());
                     }
@@ -284,6 +300,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                     in_tag = false;
                     
                     // 闭合标签后换行并补充缩进
+                    // Line break after closing tag and add indentation
                     result.push('\n');
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     current_line_length = indent_unit.len() * current_indent_level;
@@ -293,6 +310,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                     in_tag = false;
                     
                     // 自闭合标签后换行并补充缩进
+                    // Line break after self-closing tag and add indentation
                     result.push('\n');
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     current_line_length = indent_unit.len() * current_indent_level;
@@ -303,6 +321,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                     in_tag = false;
                     
                     // 开始标签后换行并增加缩进
+                    // Line break after opening tag and increase indentation
                     result.push('\n');
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     current_line_length = indent_unit.len() * current_indent_level;
@@ -312,6 +331,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
                     in_tag = false;
                     
                     // 注释/DOCTYPE 后换行并保留缩进
+                    // Line break after comment/DOCTYPE and preserve indentation
                     result.push('\n');
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     current_line_length = indent_unit.len() * current_indent_level;
@@ -342,6 +362,7 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
     }
 
     // 最终格式化：保留缩进 + 规范空格
+    // Final formatting: preserve indentation + standardized spaces
     let mut formatted = add_operator_spaces(&result);
     formatted = formatted.replace("  ", " ").trim_end_matches(&[' ', '\t'][..]).to_string();
     if !formatted.ends_with('\n') {
@@ -350,9 +371,11 @@ fn format_html(content: &str, indent: u8, max_line_length: usize) -> Result<Stri
     Ok(formatted)
 }
 
-// ------------------------------
+// ============================================================================
 // CSS 格式化（完整缩进 + 最后一行处理）
-// ------------------------------
+// CSS Formatting (full indentation + last line handling)
+// ============================================================================
+
 fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<String> {
     let indent_unit = " ".repeat(indent as usize);
     let mut result = String::new();
@@ -387,6 +410,7 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
                         chars.next();
                         result.push('\n');
                         // 注释后补充缩进
+                        // Add indentation after comment
                         result.push_str(&indent_unit.repeat(current_indent_level));
                     }
                 }
@@ -396,6 +420,7 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
                 temp_char.clear();
                 
                 // 选择器格式化（保留缩进）
+                // Selector formatting (preserve indentation)
                 if !current_selector.is_empty() {
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     result.push_str(&current_selector);
@@ -406,6 +431,7 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
                 in_brace = true;
                 result.push('\n');
                 // 大括号内增加缩进
+                // Increase indentation inside braces
                 result.push_str(&indent_unit.repeat(current_indent_level));
             }
             '}' if !in_comment => {
@@ -418,6 +444,7 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
                 }
 
                 // 格式化声明（带缩进）
+                // Format declarations (with indentation)
                 let mut formatted_decls = Vec::new();
                 for decl in &current_declarations {
                     formatted_decls.push(decl.replace(":", ": "));
@@ -441,21 +468,25 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
                 current_declarations.clear();
                 
                 // 闭合大括号前回退缩进
+                // Reduce indentation before closing brace
                 current_indent_level = current_indent_level.saturating_sub(1);
                 result.push('\n');
                 result.push_str(&indent_unit.repeat(current_indent_level));
                 result.push('}');
                 result.push('\n');
                 // 样式块后空行 + 保留缩进
+                // Empty line after style block + preserve indentation
                 result.push_str(&indent_unit.repeat(current_indent_level));
                 in_brace = false;
             }
             ';' if !in_comment && in_brace => {
                 // 修复：先复制再移动，避免所有权问题
+                // Fix: Copy first then move to avoid ownership issues
                 let decl_str = temp_char.trim().to_string();
                 if !decl_str.is_empty() {
                     current_declarations.push(decl_str.clone()); // 克隆后移动
                     // 单个声明格式化（带缩进）
+                    // Single declaration formatting (with indentation)
                     result.push_str(&decl_str.replace(":", ": ")); // 使用克隆的字符串
                     result.push(';');
                     result.push('\n');
@@ -476,6 +507,7 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
     }
 
     // 处理最后一个样式块（带完整缩进）
+    // Process last style block (with complete indentation)
     if !temp_char.is_empty() || !current_declarations.is_empty() {
         if !temp_char.is_empty() {
             let decl = temp_char.trim().to_string();
@@ -512,14 +544,17 @@ fn format_css(content: &str, indent: u8, max_line_length: usize) -> Result<Strin
     }
 
     // 最终处理：保留缩进 + 规范空格
+    // Final processing: preserve indentation + standardized spaces
     let mut formatted = add_operator_spaces(&result);
     formatted = formatted.replace("\n\n\n", "\n\n").trim_end().to_string() + "\n";
     Ok(formatted)
 }
 
-// ------------------------------
+// ============================================================================
 // JS/TS 格式化（完整缩进 + 最后一行处理）
-// ------------------------------
+// JS/TS Formatting (full indentation + last line handling)
+// ============================================================================
+
 fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<String> {
     let indent_unit = " ".repeat(indent as usize);
     let mut result = String::new();
@@ -532,6 +567,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
     let mut current_line_length = 0;
 
     // 初始缩进
+    // Initial indentation
     result.push_str(&indent_unit.repeat(current_indent_level));
 
     while let Some(c) = chars.next() {
@@ -540,6 +576,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
             if c == '\n' {
                 in_comment_single = false;
                 // 单行注释后补充缩进
+                // Add indentation after single-line comment
                 result.push_str(&indent_unit.repeat(current_indent_level));
                 current_line_length = indent_unit.len() * current_indent_level;
             }
@@ -553,6 +590,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                 result.push(chars.next().unwrap());
                 result.push('\n');
                 // 多行注释后补充缩进
+                // Add indentation after multi-line comment
                 result.push_str(&indent_unit.repeat(current_indent_level));
                 current_line_length = indent_unit.len() * current_indent_level;
             }
@@ -598,11 +636,13 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                 let is_brace = c == '{';
                 
                 // 左大括号前格式化
+                // Formatting before left brace
                 result.push_str(&current_statement);
                 if is_brace {
                     result.push('\n');
                     current_indent_level += 1;
                     // 大括号内增加缩进
+                    // Increase indentation inside braces
                     result.push_str(&indent_unit.repeat(current_indent_level));
                 }
                 current_statement.clear();
@@ -612,6 +652,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                 let is_brace = c == '}';
                 
                 // 右大括号前回退缩进
+                // Reduce indentation before right brace
                 if is_brace {
                     result.push('\n');
                     current_indent_level = current_indent_level.saturating_sub(1);
@@ -619,6 +660,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                 }
                 
                 // 处理当前语句
+                // Process current statement
                 if !current_statement.is_empty() {
                     result.push_str(&current_statement);
                     current_statement.clear();
@@ -627,6 +669,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                 current_line_length += 1;
                 
                 // 右括号后加空格/换行
+                // Add space/line break after right bracket
                 if let Some(&next_c) = chars.peek() {
                     if next_c != ',' && next_c != ';' && next_c != '}' && next_c != ')' && current_line_length > max_line_length {
                         result.push('\n');
@@ -638,9 +681,11 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
             ';' => {
                 current_statement.push(c);
                 // 语句格式化（带缩进）
+                // Statement formatting (with indentation)
                 let stmt_with_spaces = add_operator_spaces(&current_statement);
                 result.push_str(&stmt_with_spaces);
                 // 分号后换行并补充缩进
+                // Line break after semicolon and add indentation
                 result.push('\n');
                 result.push_str(&indent_unit.repeat(current_indent_level));
                 current_statement.clear();
@@ -653,6 +698,7 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
                     result.push_str(&current_statement);
                     result.push('\n');
                     // 逗号后换行并补充缩进
+                    // Line break after comma and add indentation
                     result.push_str(&indent_unit.repeat(current_indent_level));
                     current_statement.clear();
                     current_line_length = indent_unit.len() * current_indent_level;
@@ -669,10 +715,12 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
     }
 
     // 处理最后一个语句（带完整缩进）
+    // Process last statement (with complete indentation)
     if !current_statement.is_empty() {
         let mut final_stmt = add_operator_spaces(&current_statement);
         final_stmt = split_clustered_brackets(&final_stmt, &indent_unit, current_indent_level);
         // 最后语句补充当前缩进
+        // Add current indentation to final statement
         result.push_str(&indent_unit.repeat(current_indent_level));
         result.push_str(&final_stmt);
         if !final_stmt.ends_with(';') && !final_stmt.ends_with('}') && !final_stmt.ends_with(')') && !final_stmt.ends_with(']') {
@@ -682,18 +730,22 @@ fn format_js_ts(content: &str, indent: u8, max_line_length: usize) -> Result<Str
     }
 
     // 最终处理：保留所有缩进 + 拆分括号
+    // Final processing: preserve all indentation + split brackets
     let mut formatted = split_clustered_brackets(&result, &indent_unit, current_indent_level);
     formatted = formatted.replace("  ", " ").trim_end().to_string() + "\n";
     Ok(formatted)
 }
 
 /// 统一格式化入口
+/// Unified formatting entry point
 fn format_code(content: &str, file_type: &str, indent: u8, line_length: usize) -> Result<String> {
     match file_type {
         "html" => format_html(content, indent, line_length),
         "css" => format_css(content, indent, line_length),
         "js" | "ts" => format_js_ts(content, indent, line_length),
         // 修复：定义 ext 变量并使用
+        // Fix: define ext variable and use it
+
         _ => {
             let ext = file_type;
             Err(anyhow::anyhow!("不支持的文件类型：{}，仅支持 html/css/js/ts", ext))
@@ -707,6 +759,7 @@ fn main() -> Result<()> {
         .with_context(|| format!("无法读取输入文件：{}", cli.input))?;
     
     // 预处理：保留换行符（避免缩进丢失）
+    // Preprocessing: preserve line breaks (avoid indentation loss)
     let binding = raw_content.replace("\r", "");
     let content = binding.trim();
 
@@ -723,4 +776,3 @@ fn main() -> Result<()> {
     println!("[SUCCESS] 格式化完成！输出文件：{}", cli.output);
     Ok(())
 }
-
